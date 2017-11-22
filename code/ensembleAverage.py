@@ -11,31 +11,31 @@ spark = SparkSession.builder.appName('ensemble average').getOrCreate()
 schema = StructType([
     StructField('station', StringType(), False),
     StructField('dateofyear', IntegerType(), False),
-    StructField('latitude', DoubleType(), False),
-    StructField('longitude', DoubleType(), False),
-    StructField('elevation', DoubleType(), False),
-    StructField('tmax', DoubleType(), False),
-    StructField('precipitation', IntegerType(), False),
+    StructField('latitude', FloatType(), False),
+    StructField('longitude', FloatType(), False),
+    StructField('elevation', FloatType(), False),
+    StructField('tmax', FloatType(), False),
+    StructField('label', IntegerType(), False),
 ])
 
-input_file = sys.argv[0]
+input_file = sys.argv[1]
 
 data = spark.read.csv(input_file,sep=' ',schema=schema)
 
-indexer = StringIndexer(inputCol = 'station', outputCol='station_id')
-indexed = indexer.fit(data).transform(data)
+data = data.na.drop()
 
-assembler = VectorAssembler(inputCols=['station_id','dateofyear','latitude',
-                                       'longitude','elevation','tmax'],
+assembler = VectorAssembler(inputCols=['dateofyear','latitude', 
+                                       'longitude','elevation',
+                                       'tmax'],
                             outputCol='features')
 
-output = assembler.transform(indexed)
+output = assembler.transform(data)
 
-final_data = output.select('features','precipitation')
+final_data = output.select('features','label')
 
 train_data,test_data = final_data.randomSplit([0.7,0.3])
 
-layers = [4, 5, 4, 2]
+layers = [5, 3, 3, 2]
 
 trainer = MultilayerPerceptronClassifier(maxIter=100, 
                                          layers=layers, 
