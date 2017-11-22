@@ -4,6 +4,7 @@ from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.sql.types import *
 from pyspark.ml.linalg import Vectors
 from pyspark.ml.feature import VectorAssembler, StringIndexer
+import sys
 
 spark = SparkSession.builder.appName('ensemble average').getOrCreate()
 
@@ -17,7 +18,9 @@ schema = StructType([
     StructField('precipitation', IntegerType(), False),
 ])
 
-data = spark.read.csv('../data/weather-2_tmax-2.csv',sep=' ',schema=schema)
+input_file = sys.argv[0]
+
+data = spark.read.csv(input_file,sep=' ',schema=schema)
 
 indexer = StringIndexer(inputCol = 'station', outputCol='station_id')
 indexed = indexer.fit(data).transform(data)
