@@ -19,6 +19,7 @@ assert spark.version >= '2.2'  # make sure we have Spark 2.2+
  
 # Generates a hyperparameter RDD with the indicated parameters
 def generateHyperParamsRDD() :
+	activationFuncs = ['logistic', 'tanh', 'relu']
 	learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
 	maxIters = [50,100,200,500,1000,2000] # Max number of epochs
 	numHiddenL = [1,2,3] # Number of hidden layers
@@ -46,10 +47,11 @@ def generateHyperParamsRDD() :
 
 	# Fill in the RDD of hyperparameter combinations
 	hyperParams = []
-	for lr in learnRates :
-		for iters in maxIters :
-			for hl in hiddenLayerNums :
-				hyperParams.append([lr,iters,hl])
+	for f in activationFuncs :
+		for lr in learnRates :
+			for iters in maxIters :
+				for hl in hiddenLayerNums :
+					hyperParams.append([f,lr,iters,hl])
 
 
 	# Transform the hyperparameter array into an RDD
@@ -63,9 +65,10 @@ def transformTest(row) :
 
 def generateModels(params) :
 	model =  MLPClassifier(solver='sgd', learning_rate='constant',
-					learning_rate_init=params[0],
-					max_iter=params[1],
-					hidden_layer_sizes=params[2])
+					activation=params[0],
+					learning_rate_init=params[1],
+					max_iter=params[2],
+					hidden_layer_sizes=params[3])
 	model.fit(rdd_train_X.value,rdd_train_y.value)
 	preds = model.predict(rdd_test_X.value)
 	return (model,accuracy_score(rdd_test_y.value,preds))
