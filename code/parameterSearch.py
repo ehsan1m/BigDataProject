@@ -19,11 +19,20 @@ assert spark.version >= '2.2'  # make sure we have Spark 2.2+
  
 # Generates a hyperparameter RDD with the indicated parameters
 def generateHyperParamsRDD() :
-	activationFuncs = ['logistic', 'tanh', 'relu']
-	learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-	maxIters = [50,100,200,500,1000,2000] # Max number of epochs
-	numHiddenL = [1,2,3] # Number of hidden layers
-	neuronsPerLayer = [1,2,3,4,5] # Number of neurons in each hidden layer
+	# Use this for long tests
+	# activationFuncs = ['logistic', 'tanh', 'relu']
+	# learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
+	# maxIters = [50,100,200,500,1000,2000] # Max number of epochs
+	# numHiddenL = [1,2,3] # Number of hidden layers
+	# neuronsPerLayer = [1,2,5,10,20] # Number of neurons in each hidden layer
+	# hiddenLayerNums = []
+
+	# Use this for short tests
+	activationFuncs = ['logistic']
+	learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
+	maxIters = [500,1000,2000] # Max number of epochs
+	numHiddenL = [1,2] # Number of hidden layers
+	neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
 	hiddenLayerNums = []
 
 	# Fill in the different hidden layer neuron combinations
@@ -79,15 +88,6 @@ def getBestModel(m1,m2) :
 		return m1
 	else :
 		return m2
-
-# Function to add up 2 data points.
-def addPoints(p1,p2) :
-	return (p1[0]+p2[0],p1[1]+p2[1])
-
-# Format of the output
-def output_format(kv):
-	v1,v2 = kv
-	return 'r = %f \nr^2 = %f' % (v1,v2)
  
 if __name__ == "__main__":
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
 	schema = StructType([
 		StructField('station', StringType(), False), \
-		StructField('date', DateType(), False), \
+		StructField('dateofyear', DateType(), False), \
 		StructField('latitude', FloatType(), False), \
 		StructField('longitude', FloatType(), False), \
 		StructField('elevation', FloatType(), False), \
@@ -109,8 +109,10 @@ if __name__ == "__main__":
 	.option("header", "false").option("inferSchema", "true") \
 	.option("delimiter", ' ').load(inputData)
 
+	# Drop station column
 	weatherData = weatherData.drop(weatherData._c0)
 
+	# Randomly split data for training and validation
 	train,test = weatherData.randomSplit([0.75, 0.25])
 
 	# Generate dataframes for classlabels and drop class rows
@@ -134,15 +136,11 @@ if __name__ == "__main__":
 	testYRdd = testYRdd.map(transformTest)
 
 	# Broadcast train data and train labels
-	# X = [[0., 0.], [1., 1.]]
 	rdd_train_X = sc.broadcast(trainRdd.collect())
-	# y = [0, 1]
 	rdd_train_y = sc.broadcast(trainYRdd.collect())
 
 	# # Broadcast test data
-	# t = [[2., 2.], [-1., -2.]]
 	rdd_test_X = sc.broadcast(testRdd.collect())
-	# tY = [0, 1]
 	rdd_test_y = sc.broadcast(testYRdd.collect())
 
 	# RDD with (model,accuracy)
@@ -153,3 +151,10 @@ if __name__ == "__main__":
 
 	# # Print best model and accuracy
 	print(bestModel)
+	print("Model Info :")
+	print("Activation function :"+bestModel[0].activation)
+	print("Max iters : "+str(bestModel[0].max_iter))
+	print("Learning rate : "+str(bestModel[0].learning_rate_init))
+	print("Num hidden layers : "+str(len(bestModel[0].hidden_layer_sizes)))
+	print("Hidden layer numbers : "+str(bestModel[0].hidden_layer_sizes))
+	print("Accuracy : "+str(bestModel[1]))
