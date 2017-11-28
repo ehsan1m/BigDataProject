@@ -116,9 +116,10 @@ data = data.na.drop()
 
 train_data,test_data = data.randomSplit([0.7,0.3]) # Splitting the dataset between training and testing data
 
+######
 #### Start of hyper parameter search using Scikit Learn
+######
 
-# FEATURE SELECTION -----------------------------------
 # Generate the RDD of hyperparameters to test
 paramsRdd = generateHyperParamsRDD()
 
@@ -188,13 +189,6 @@ trainer = MultilayerPerceptronClassifier(maxIter=iters,
                                          stepSize=lr,
                                          blockSize=128, 
                                          seed=1234)
-#layers = [5, 15, 2]
-
-#trainer = MultilayerPerceptronClassifier(maxIter=500, 
-#                                         layers=layers,
-#                                         stepSize=0.001, 
-#                                         blockSize=128, 
-#                                         seed=1234)
 
 pipeline = Pipeline(stages=[assembler,trainer])
 
