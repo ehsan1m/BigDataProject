@@ -1,17 +1,14 @@
 from pyspark.sql import SparkSession
 from pyspark.ml.classification import MultilayerPerceptronClassifier
-from pyspark.ml.evaluation import MulticlassClassificationEvaluator
 from pyspark.sql.types import *
-from pyspark.ml.linalg import Vectors
-from pyspark.ml.feature import VectorAssembler, StringIndexer
+from pyspark.ml.feature import VectorAssembler
 import sys
-from pyspark import SparkConf, SparkContext
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
-from pyspark.sql import SparkSession, Row, functions, Column
+from pyspark.sql import SparkSession
 from pyspark.sql.types import *
-from pyspark.sql.functions import udf
-from datetime import datetime
+import pandas as pd
+import numpy as np
 
 
 spark = SparkSession.builder.appName('ensemble_with_param_search').getOrCreate()
@@ -89,6 +86,14 @@ def getBestModel(m1,m2) :
         return m1
     else :
         return m2
+
+# For a row with columns as predictions, choose the class based on the majority
+def committee_voting(dataframe_row):
+    total_values = dataframe_row.values.sum()
+    if total_values >= (num_of_experts / 2):
+        return 1
+    else:
+        return 0        
  
 schema = StructType([
     StructField('station', StringType(), False),
@@ -115,14 +120,14 @@ output = assembler.transform(data)
 
 final_data = output.select('features','label')
 
-train_data,test_data = final_data.randomSplit([0.7,0.3])
+train_data,test_data = final_data.randomSplit([0.8,0.2])
 
 # FEATURE SELECTION -----------------------------------
 # Generate the RDD of hyperparameters to test
 paramsRdd = generateHyperParamsRDD()
 
 # Get train and validation data
-train,val = train_data.randomSplit([0.7,0.3])
+train,val = train_data.randomSplit([0.8,0.2])
 
 # Generate dataframes for classlabels and drop class rows
 trainY = train.select(train.label)
@@ -169,19 +174,58 @@ layers = [5] + hlayers + [2]
 
 # THIS IS WHERE HYPERPARAMETER SEARCH ENDS
 
-trainer = MultilayerPerceptronClassifier(maxIter=iters, 
-                                         layers=layers,
-                                         stepSize=lr,
-                                         blockSize=128, 
-                                         seed=1234)
 
-model = trainer.fit(train_data)
 
-result = model.transform(test_data)
+# Define number of experts (neural nets) to be trained
+num_of_experts = 10
 
-predictionAndLabels = result.select("prediction", "label")
+# Dictionary to store the models trained for each expert
+dict_of_models = dict()
 
-evaluator = MulticlassClassificationEvaluator(metricName="accuracy")
+# List of dataframes for each of the experts
+dataframes = final_data.randomSplit([1.0 for x in range(num_of_experts)],seed=1234)
 
-print("Validation set accuracy = " + str(acc))
-print("Test set accuracy = " + str(evaluator.evaluate(predictionAndLabels)))
+# Get the models for each expert using the parameters of the best model defined above
+for expert in range(num_of_experts):
+
+    train_data,test_data = dataframes[expert].randomSplit([0.75,0.25])
+    
+    trainer = MultilayerPerceptronClassifier(maxIter=iters, 
+                                             layers=layers,
+                                             stepSize=lr,
+                                             blockSize=128, 
+                                             seed=1234)
+    model = trainer.fit(train_data)
+    dict_of_models[expert] = model
+
+# Dictionary to store the predictions of the full dataset for each trained expert
+dict_of_predictions = dict()
+
+# Iterate through the expert and predict the values of each dataset
+for expert in range(num_of_experts):
+    dict_of_predictions[expert] = dict_of_models[expert].transform(final_data)
+
+# Create a pandas dataframe whose columns are each predictions of each expert
+evaluations = pd.concat([dict_of_predictions[x].toPandas().prediction for x in range(num_of_experts)],axis=1)
+
+# Rename the prediction columns to reference the number of the expert (sequential)
+evaluations.columns = ['prediction'+str(x) for x in range(num_of_experts)]
+
+# Create a list with the result of the committee votation
+evaluations_vote = []
+for index, row in evaluations.iterrows():
+    evaluations_vote.append(committee_voting(row))
+
+
+# Create a dataframe with the label and the prediction
+predictionAndLabels = pd.concat([final_data.toPandas().label, pd.DataFrame(evaluations_vote)],axis=1)
+predictionAndLabels.columns = ['label','predictions']
+
+# Create tha colum 'evaluation' to check if the prediction is correct
+predictionAndLabels['evaluation'] = np.where(predictionAndLabels.label == predictionAndLabels.predictions, 1, 0)
+
+accuracy = predictionAndLabels.evaluation.sum() / predictionAndLabels.shape[0]
+
+print("total os 0's: " + str(predictionAndLabels.shape[0] - predictionAndLabels.evaluation.sum()) )
+print("total os 1's: " + str(predictionAndLabels.evaluation.sum()) )
+print('accuracy: ' + str(accuracy))
