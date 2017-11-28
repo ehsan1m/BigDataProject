@@ -4,22 +4,14 @@ import sys
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
-from pyspark.sql import SparkSession
-from pyspark.sql.types import *
-
-from sklearn.neural_network import MLPClassifier
 
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.classification import MultilayerPerceptronClassifier
 from pyspark.ml.evaluation import RegressionEvaluator
-from pyspark.ml.regression import LinearRegression
 from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 
-from sklearn.metrics import accuracy_score
 
-
-spark = SparkSession.builder.appName('ensemble_with_param_search').getOrCreate()
-sc = spark.sparkContext
+spark = SparkSession.builder.appName('ensemble_with_param_grid').getOrCreate()
 
 # For a row with columns as predictions, choose the class based on the majority
 def committee_voting(dataframe_row):
@@ -31,7 +23,7 @@ def committee_voting(dataframe_row):
 
 schema = StructType([
     StructField('station', StringType(), False),
-    StructField('dateofyear', IntegerType(), False),
+    StructField('dateofyear', FloatType(), False),
     StructField('latitude', FloatType(), False),
     StructField('longitude', FloatType(), False),
     StructField('elevation', FloatType(), False),
@@ -56,30 +48,29 @@ output = assembler.transform(data)
 # create spark df with the columns features and label
 final_data = output.select('features','label')
 
-train_data,test_data = final_data.randomSplit([0.8,0.2])
-
 ##### GRID PARAMETER BUILDER
 
-mlpc = MultilayerPerceptronClassifier()
+mlpc = MultilayerPerceptronClassifier(blockSize=128, seed=1234)
 
 # We use a ParamGridBuilder to construct a grid of parameters to search over.
 # TrainValidationSplit will try all combinations of values and determine best model using
 # the evaluator.
-paramGrid = ParamGridBuilder() \
-	.addGrid(mlpc.maxIter, [5, 1000,1000,2000]) \
-    .addGrid(mlpc.layers, [[2,2,2],[2,5,2],[3,6,3,2]])\
-    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02])\
-    .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
-    .addGrid(mlpc.tol, [1e-06, 1e-05, 1e-04])\
-    .build()
+# paramGrid = ParamGridBuilder() \
+# 	.addGrid(mlpc.maxIter, [5, 1000,1000,2000]) \
+#     .addGrid(mlpc.layers, [[2,2,2],[2,5,2],[3,6,3,2]])\
+#     .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02])\
+#     .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
+#     .addGrid(mlpc.tol, [1e-06, 1e-05, 1e-04])\
+#     .build()
 
 # SIMPLER COMBINATION FOR TEST
-# paramGrid = ParamGridBuilder().addGrid(mlpc.maxIter, [5, 10]) \
-#     .addGrid(mlpc.layers, [[5,2,2],[5,5,2]])\
-#     .addGrid(mlpc.stepSize, [0.5,0.2])\
-#     .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
-#     .addGrid(mlpc.tol, [1e-06, 1e-05])\
-#     .build()
+paramGrid = ParamGridBuilder() \
+    .addGrid(mlpc.maxIter, [5, 10]) \
+    .addGrid(mlpc.layers, [[5,2,2],[5,5,2]]) \
+    .addGrid(mlpc.stepSize, [0.5,0.2]) \
+    .build()
+
+
 
 # A TrainValidationSplit requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
 tvs = TrainValidationSplit(estimator=mlpc,

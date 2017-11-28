@@ -1,14 +1,15 @@
-from pyspark.sql import SparkSession
-from pyspark.ml.classification import MultilayerPerceptronClassifier
-from pyspark.sql.types import *
-from pyspark.ml.feature import VectorAssembler
 import sys
-from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score
-from pyspark.sql import SparkSession
-from pyspark.sql.types import *
 import pandas as pd
 import numpy as np
+
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.classification import MultilayerPerceptronClassifier
+
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score
 
 
 spark = SparkSession.builder.appName('ensemble_with_param_search').getOrCreate()
@@ -97,7 +98,7 @@ def committee_voting(dataframe_row):
  
 schema = StructType([
     StructField('station', StringType(), False),
-    StructField('dateofyear', IntegerType(), False),
+    StructField('dateofyear', FloatType(), False),
     StructField('latitude', FloatType(), False),
     StructField('longitude', FloatType(), False),
     StructField('elevation', FloatType(), False),
