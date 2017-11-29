@@ -3,6 +3,7 @@ import sys
 import operator
 import math
 import re, string
+import time
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
 from pyspark.sql import SparkSession, Row, functions, Column
@@ -29,16 +30,16 @@ def generateHyperParamsRDD() :
 	# Use this for long tests
 	# activationFuncs = ['logistic', 'tanh', 'relu']
 	# learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-	# maxIters = [50,100,200,500,1000,2000] # Max number of epochs
+	# maxIters = [500,1000,2000] # Max number of epochs
 	# numHiddenL = [1,2,3] # Number of hidden layers
-	# neuronsPerLayer = [1,2,5,10,20] # Number of neurons in each hidden layer
+	# neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
 	# hiddenLayerNums = []
 
 	# Use this for short tests
 	activationFuncs = ['logistic']
 	learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
-	maxIters = [500,1000,2000] # Max number of epochs
-	numHiddenL = [1,2] # Number of hidden layers
+	maxIters = [500,1000] # Max number of epochs
+	numHiddenL = [1] # Number of hidden layers
 	neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
 	hiddenLayerNums = []
 
@@ -98,7 +99,7 @@ def getBestModel(m1,m2) :
 
 schema = StructType([
     StructField('station', StringType(), False),
-    StructField('dateofyear', IntegerType(), False),
+    StructField('dateofyear', FloatType(), False),
     StructField('latitude', FloatType(), False),
     StructField('longitude', FloatType(), False),
     StructField('elevation', FloatType(), False),
@@ -107,14 +108,14 @@ schema = StructType([
 ])
 
 
-
+print("Reading input data...")
 data = spark.read.csv(input_file,sep=' ',schema=schema)
 
 data = data.drop('station')
 
 data = data.na.drop()
 
-train_data,test_data = data.randomSplit([0.7,0.3]) # Splitting the dataset between training and testing data
+train_data,test_data = data.randomSplit([0.8,0.2]) # Splitting the dataset between training and testing data
 
 ######
 #### Start of hyper parameter search using Scikit Learn
@@ -124,7 +125,7 @@ train_data,test_data = data.randomSplit([0.7,0.3]) # Splitting the dataset betwe
 paramsRdd = generateHyperParamsRDD()
 
 # Get train and validation data
-train,val = train_data.randomSplit([0.7,0.3])
+train,val = train_data.randomSplit([0.8,0.2])
 
 # Generate dataframes for classlabels and drop class rows
 trainY = train.select(train.label)
@@ -155,6 +156,8 @@ rdd_val_X = sc.broadcast(valRdd.collect())
 rdd_val_y = sc.broadcast(valYRdd.collect())
 
 # RDD with (model,accuracy)
+start = time.time()
+print("Calculating best model...")
 modelsRdd = paramsRdd.map(generateModels)
 
 # Get the model with best accuracy :
@@ -169,9 +172,15 @@ acc = bestModel[1]
 
 layers = [5] + hlayers + [2]
 
-print('Best foudn parameters:')
-print('Learning Rate:',lr)
-print('hlayers',hlayers)
+end = time.time()
+
+print("---------------------- Best model info ----------------------")
+print("Activation func : "+act)
+print("Max epochs : "+str(iters))
+print("Learning rate : "+str(lr))
+print("Hidden layers : " + str(hlayers))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------")
 
 #######
 #### End of hyper parameter search
@@ -192,6 +201,8 @@ trainer = MultilayerPerceptronClassifier(maxIter=iters,
 
 pipeline = Pipeline(stages=[assembler,trainer])
 
+print("Generating and training experts...")
+start = time.time()
 #Training the first MLP
 model1 = pipeline.fit(data1) # Using the first subset to train the first MLP
 
@@ -220,10 +231,12 @@ train3 = train3.select('dateofyear','latitude','longitude','elevation','tmax','l
 model3 = pipeline.fit(train3) #Training the third MLP
 
 #Generating predictions from the three MLPs on the test data (without boosting)
+print("Generating predictions...")
 predictions1 = model1.transform(test_data)
 predictions2 = model2.transform(test_data)
 predictions3 = model3.transform(test_data)
 
+end = time.time()
 evaluator = MulticlassClassificationEvaluator(metricName="accuracy")
 
 #Evaluating the three MLPs on the test data (without boosting)
@@ -242,9 +255,12 @@ ensemblePrediction = ensemblePrediction.withColumn('prediction',ensemblePredicti
 
 score = evaluator.evaluate(ensemblePrediction)
 
-print("Test set accuracy for the first expert = " , score1)
-print("Test set accuracy for the second expert = " , score2)
-print("Test set accuracy for the third expert = " , score3)
-print("Test set accuracy with boosting = " , score)
+print("---------------------- Final train/test info ----------------------")
+print("Accuracy for first expert :"+str(score1))
+print("Accuracy for second expert :"+str(score1))
+print("Accuracy for third expert :"+str(score1))
+print("Final accuracy : "+str(score))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------------")
  
 

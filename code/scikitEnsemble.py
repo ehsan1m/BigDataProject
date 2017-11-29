@@ -10,7 +10,9 @@ from pyspark.sql.types import *
 from pyspark.sql.functions import udf
 from datetime import datetime
 import numpy as np
- 
+import time
+
+# Input file name
 inputData = sys.argv[1]
 
 spark = SparkSession.builder.appName('Parameter search').getOrCreate()
@@ -21,18 +23,18 @@ assert spark.version >= '2.2'  # make sure we have Spark 2.2+
 # Generates a hyperparameter RDD with the indicated parameters
 def generateHyperParamsRDD() :
 	# Use this for long tests
-	activationFuncs = ['logistic', 'tanh', 'relu']
+	# activationFuncs = ['logistic', 'tanh', 'relu']
 	# learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-	# maxIters = [50,100,200,500,1000,2000] # Max number of epochs
+	# maxIters = [500,1000,2000] # Max number of epochs
 	# numHiddenL = [1,2,3] # Number of hidden layers
-	# neuronsPerLayer = [1,2,5,10,20] # Number of neurons in each hidden layer
+	# neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
 	# hiddenLayerNums = []
 
 	# Use this for short tests
-	# activationFuncs = ['logistic']
+	activationFuncs = ['logistic']
 	learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
-	maxIters = [500,1000,2000] # Max number of epochs
-	numHiddenL = [1,2] # Number of hidden layers
+	maxIters = [500,1000] # Max number of epochs
+	numHiddenL = [1] # Number of hidden layers
 	neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
 	hiddenLayerNums = []
 
@@ -134,15 +136,33 @@ def calcPreds(pred) :
 		newPred = 0
 	return newPred
 
+def genConfMatrix(realLabels,preds) :
+	TP = 0
+	TN = 0
+	FP = 0
+	FN = 0
+	for i in range(len(realLabels)) :
+		if (realLabels[i] == 1) and (preds[i] == 1) :
+			TP += 1
+		elif (realLabels[i] == 1) and (preds[i] == 0) :
+			FN += 1
+		elif (realLabels[i] == 0) and (preds[i] == 1) :
+			FP += 1
+		elif (realLabels[i] == 0) and (preds[i] == 0) :
+			TN += 1
+
+	return TP,TN,FP,FN
+
 # 	return preds
 if __name__ == "__main__":
 
 	# Generate the RDD of hyperparameters to test
+	print("Filling Hyperparameter RDD...")
 	paramsRdd = generateHyperParamsRDD()
 
 	schema = StructType([
 		StructField('station', StringType(), False), \
-		StructField('dateofyear', DateType(), False), \
+		StructField('dateofyear', FloatType(), False), \
 		StructField('latitude', FloatType(), False), \
 		StructField('longitude', FloatType(), False), \
 		StructField('elevation', FloatType(), False), \
@@ -151,6 +171,7 @@ if __name__ == "__main__":
 	])
 
 	# weatherData = spark.read.csv(inputData,schema,sep=' ')
+	print("Reading input data...")
 	weatherData = spark.read.format("com.databricks.spark.csv") \
 	.option("header", "false").option("inferSchema", "true") \
 	.option("delimiter", ' ').load(inputData)
@@ -195,7 +216,10 @@ if __name__ == "__main__":
 	rdd_val_X = sc.broadcast(valRdd.collect())
 	rdd_val_y = sc.broadcast(valYRdd.collect())
 
+	# Measure time
+	start = time.time()
 	# RDD with (model,accuracy)
+	print("Calculating best model...")
 	modelsRdd = paramsRdd.map(generateModels)
 
 	# Get the model with best accuracy :
@@ -214,14 +238,21 @@ if __name__ == "__main__":
 	sc.broadcast(lr)
 	sc.broadcast(hlayers)
 
-	print("Best parameters :")
+	# Measure time
+	end = time.time()
+
+	print("---------------------- Best model info ----------------------")
 	print("Activation func : "+act)
 	print("Max epochs : "+str(iters))
 	print("Learning rate : "+str(lr))
 	print("Hidden layers : " + str(hlayers))
+	print("Time : "+str(end - start)+" seconds")
+	print("-------------------------------------------------------------")
 
 	# Here is where the hyperparameter search ends 
 
+	# Generate the 10 data sets, one for each expert in the ensemble
+	print("Processing data for final training and testing...")
 	data1,data2,data3,data4,data5, \
 	data6,data7,data8,data9,data10 = realTrain. \
 	randomSplit([0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1])
@@ -233,6 +264,10 @@ if __name__ == "__main__":
 	# Generate test rdd
 	testYRdd = testY.rdd 
 	testRdd = test.rdd
+
+	# Transform from rows into lists
+	testYRdd = testYRdd.map(transformTest)
+	testRdd = testRdd.map(listTransformTrain)
 
 	# Broadcast test set and labels
 	rdd_test_X = sc.broadcast(testRdd.collect())
@@ -259,10 +294,15 @@ if __name__ == "__main__":
 	# Make an rdd for each training list
 	trainRdd = sc.parallelize(rddList)
 
+	# Measure time
+	start = time.time()
+
 	# Generate an Rdd of trained models
+	print("Training experts...")
 	modelRdd = trainRdd.map(trainFinalModels)
 
 	# Get predictions
+	print("Generating predictions...")
 	predRdd = modelRdd.map(getTestPredictions)
 
 	# Sum all predictions
@@ -274,11 +314,24 @@ if __name__ == "__main__":
 	# Get final predictions by getting the average and transforming to 1s and 0s
 	finalPreds = sumPredsRdd.map(calcPreds)
 
+	# Calculate final accuracy
 	finalAccuracy = accuracy_score(testYRdd.collect(),finalPreds.collect())
 
+	# Generate confusion matrix
+	TP,TN,FP,FN = genConfMatrix(testYRdd.collect(),finalPreds.collect())
+
+	# Measure time
+	end = time.time()
 	# Print accuracy
-	print("Final accuracy : ")
-	print(finalAccuracy)
+
+	print("---------------------- Final train/test info ----------------------")
+	print("Final accuracy : "+str(finalAccuracy))
+	print("Real 1s classified as 1s : "+str(TP)) 
+	print("Real 0s classified as 0s : "+str(TN)) 
+	print("Real 1s classified as 0s : "+str(FN))
+	print("Real 0s classified as 1s : "+str(FP))
+	print("Time : "+str(end - start)+" seconds")
+	print("-------------------------------------------------------------------")
 
 
 

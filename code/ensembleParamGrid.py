@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import sys
+import time
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
@@ -33,6 +34,7 @@ schema = StructType([
 
 input_file = sys.argv[1] 
 
+print("Reading input data...")
 data = spark.read.csv(input_file,sep=' ',schema=schema)
 
 #drop the rows with 'nan' values (if exist)
@@ -47,6 +49,8 @@ output = assembler.transform(data)
 
 # create spark df with the columns features and label
 final_data = output.select('features','label')
+
+train_data,test_data = final_data.randomSplit([0.8,0.2])
 
 ##### GRID PARAMETER BUILDER
 
@@ -64,15 +68,17 @@ mlpc = MultilayerPerceptronClassifier(blockSize=128, seed=1234)
 #     .build()
 
 # SIMPLER COMBINATION FOR TEST
+print("Creating parameter grid builder...")
 paramGrid = ParamGridBuilder() \
-    .addGrid(mlpc.maxIter, [5, 10]) \
-    .addGrid(mlpc.layers, [[5,2,2],[5,5,2]]) \
-    .addGrid(mlpc.stepSize, [0.5,0.2]) \
+    .addGrid(mlpc.maxIter, [500,1000]) \
+    .addGrid(mlpc.layers, [[5,1,2],[5,2,2],[5,5,2]]) \
+    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
     .build()
 
 
-
+print("Calculating best model...")
 # A TrainValidationSplit requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
+start = time.time()
 tvs = TrainValidationSplit(estimator=mlpc,
                            estimatorParamMaps=paramGrid,
                            evaluator=RegressionEvaluator(),
@@ -90,6 +96,15 @@ solver = bestmodel._java_obj.parent().getSolver()
 tol = bestmodel._java_obj.parent().getTol()
 lr = bestmodel._java_obj.parent().getStepSize()
 
+end = time.time()
+
+print("---------------------- Best model info ----------------------")
+print("Max epochs : "+str(iters))
+print("Learning rate : "+str(lr))
+print("Hidden layers : " + str(layers))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------")
+
 # Define number of experts (neural nets) to be trained
 num_of_experts = 10
 
@@ -100,6 +115,8 @@ dict_of_models = dict()
 dataframes = final_data.randomSplit([1.0 for x in range(num_of_experts)],seed=1234)
 
 # Get the models for each expert using the parameters of the best model defined above
+print("Generating and training experts...")
+start = time.time()
 for expert in range(num_of_experts):
 
     train_data,test_data = dataframes[expert].randomSplit([0.8,0.2])
@@ -118,6 +135,7 @@ for expert in range(num_of_experts):
 dict_of_predictions = dict()
 
 # Iterate through the expert and predict the values of each dataset
+print("Generating predictions...")
 for expert in range(num_of_experts):
     dict_of_predictions[expert] = dict_of_models[expert].transform(final_data)
 
@@ -132,6 +150,7 @@ evaluations_vote = []
 for index, row in evaluations.iterrows():
     evaluations_vote.append(committee_voting(row))
 
+end = time.time()
 
 # Create a dataframe with the label and the prediction
 predictionAndLabels = pd.concat([final_data.toPandas().label, pd.DataFrame(evaluations_vote)],axis=1)
@@ -142,7 +161,11 @@ predictionAndLabels['evaluation'] = np.where(predictionAndLabels.label == predic
 
 accuracy = predictionAndLabels.evaluation.sum() / predictionAndLabels.shape[0]
 
-print("total os 0's: " + str(predictionAndLabels.shape[0] - predictionAndLabels.evaluation.sum()) )
-print("total os 1's: " + str(predictionAndLabels.evaluation.sum()) )
-print('accuracy: ' + str(accuracy))
+print("---------------------- Final train/test info ----------------------")
+print("Final accuracy : "+str(accuracy))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------------")
+# print("total os 0's: " + str(predictionAndLabels.shape[0] - predictionAndLabels.evaluation.sum()) )
+# print("total os 1's: " + str(predictionAndLabels.evaluation.sum()) )
+# print('accuracy: ' + str(accuracy))
 

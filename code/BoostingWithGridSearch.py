@@ -8,12 +8,13 @@ from pyspark.ml import Pipeline
 from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 from pyspark.ml.evaluation import RegressionEvaluator
 import sys
+import time
 
 spark = SparkSession.builder.appName('Boosted MLPs').getOrCreate()
 
 schema = StructType([
     StructField('station', StringType(), False),
-    StructField('dateofyear', IntegerType(), False),
+    StructField('dateofyear', FloatType(), False),
     StructField('latitude', FloatType(), False),
     StructField('longitude', FloatType(), False),
     StructField('elevation', FloatType(), False),
@@ -23,13 +24,14 @@ schema = StructType([
 
 input_file = sys.argv[1]
 
+print("Reading input data...")
 data = spark.read.csv(input_file,sep=' ',schema=schema)
 
 data = data.drop('station')
 
 data = data.na.drop()
 
-train_data,test_data = data.randomSplit([0.7,0.3]) # Splitting the dataset between training and testing data
+train_data,test_data = data.randomSplit([0.8,0.2]) # Splitting the dataset between training and testing data
 
 data1, data2, data3 = train_data.randomSplit([1.0,2.0,20.0],1234) # Splitting thetraining data into 3 subsets for boosting, each used for one MLP. The second and third sets are twice and ten times larger than the first, respectively
 
@@ -46,10 +48,11 @@ mlpc = MultilayerPerceptronClassifier()
 # We use a ParamGridBuilder to construct a grid of parameters to search over.
 # TrainValidationSplit will try all combinations of values and determine best model using
 # the evaluator.
+print("Creating parameter grid builder...")
 paramGrid = ParamGridBuilder() \
-	.addGrid(mlpc.maxIter, [500]) \
-    .addGrid(mlpc.layers, [[5,15,2],[5,10,5,2],[5,15,10,2]])\
-    .addGrid(mlpc.stepSize, [0.1,0.05])\
+	.addGrid(mlpc.maxIter, [500,1000]) \
+    .addGrid(mlpc.layers, [[5,1,2],[5,2,2],[5,5,2]])\
+    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02])\
     .addGrid(mlpc.solver, ['l-bfgs'])\
     .addGrid(mlpc.tol, [1e-06])\
     .build()
@@ -63,6 +66,8 @@ paramGrid = ParamGridBuilder() \
 #     .build()
 
 # A TrainValidationSplit requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
+print("Calculating best model...")
+start = time.time()
 tvs = TrainValidationSplit(estimator=mlpc,
                            estimatorParamMaps=paramGrid,
                            evaluator=RegressionEvaluator(),
@@ -83,11 +88,14 @@ solver = bestmodel._java_obj.parent().getSolver()
 tol = bestmodel._java_obj.parent().getTol()
 lr = bestmodel._java_obj.parent().getStepSize()
 
-print('Best foudn parameters:')
-print('Learning Rate:',lr)
-print('layers:',layers)
-print('Solver:',solver)
-print('iter:',iters)
+end = time.time()
+
+print("---------------------- Best model info ----------------------")
+print("Max epochs : "+str(iters))
+print("Learning rate : "+str(lr))
+print("Hidden layers : " + str(layers))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------")
 
 
 #### End of grid parameter search
@@ -106,6 +114,8 @@ trainer = MultilayerPerceptronClassifier(maxIter=iters,
 pipeline = Pipeline(stages=[assembler,trainer])
 
 #Training the first MLP
+print("Generating and training experts...")
+start = time.time()
 model1 = pipeline.fit(data1) # Using the first subset to train the first MLP
 
 predictions = model1.transform(data2) # Testing the first MLP on the second data subset
@@ -133,9 +143,12 @@ train3 = train3.select('dateofyear','latitude','longitude','elevation','tmax','l
 model3 = pipeline.fit(train3) #Training the third MLP
 
 #Generating predictions from the three MLPs on the test data (without boosting)
+print("Generating predictions...")
 predictions1 = model1.transform(test_data)
 predictions2 = model2.transform(test_data)
 predictions3 = model3.transform(test_data)
+
+end = time.time()
 
 evaluator = MulticlassClassificationEvaluator(metricName="accuracy")
 
@@ -155,7 +168,10 @@ ensemblePrediction = ensemblePrediction.withColumn('prediction',ensemblePredicti
 
 score = evaluator.evaluate(ensemblePrediction)
 
-print("Test set accuracy for the first expert = " , score1)
-print("Test set accuracy for the second expert = " , score2)
-print("Test set accuracy for the third expert = " , score3)
-print("Test set accuracy with boosting = " , score)
+print("---------------------- Final train/test info ----------------------")
+print("Accuracy for first expert :"+str(score1))
+print("Accuracy for second expert :"+str(score1))
+print("Accuracy for third expert :"+str(score1))
+print("Final accuracy : "+str(score))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------------")

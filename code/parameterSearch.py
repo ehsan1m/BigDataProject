@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
 	schema = StructType([
 		StructField('station', StringType(), False), \
-		StructField('dateofyear', DateType(), False), \
+		StructField('dateofyear', FloatType(), False), \
 		StructField('latitude', FloatType(), False), \
 		StructField('longitude', FloatType(), False), \
 		StructField('elevation', FloatType(), False), \
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 	weatherData = weatherData.drop(weatherData._c0)
 
 	# Randomly split data for training and validation
-	train,test = weatherData.randomSplit([0.75, 0.25])
+	train,test = weatherData.randomSplit([0.8, 0.2])
 
 	# Generate dataframes for classlabels and drop class rows
 	trainY = train.select(train._c6)

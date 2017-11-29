@@ -1,6 +1,7 @@
 import sys
 import pandas as pd
 import numpy as np
+import time
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
@@ -20,16 +21,16 @@ def generateHyperParamsRDD() :
     # Use this for long tests
     # activationFuncs = ['logistic', 'tanh', 'relu']
     # learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-    # maxIters = [50,100,200,500,1000,2000] # Max number of epochs
+    # maxIters = [500,1000,2000] # Max number of epochs
     # numHiddenL = [1,2,3] # Number of hidden layers
-    # neuronsPerLayer = [1,2,5,10,20] # Number of neurons in each hidden layer
+    # neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
     # hiddenLayerNums = []
-
+    
     # Use this for short tests
     activationFuncs = ['logistic']
     learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
-    maxIters = [500,1000,2000] # Max number of epochs
-    numHiddenL = [1,2] # Number of hidden layers
+    maxIters = [500,1000] # Max number of epochs
+    numHiddenL = [1] # Number of hidden layers
     neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
     hiddenLayerNums = []
 
@@ -108,6 +109,7 @@ schema = StructType([
 
 input_file = sys.argv[1]
 
+print("Reading input data...")
 data = spark.read.csv(input_file,sep=' ',schema=schema)
 
 data = data.na.drop()
@@ -125,6 +127,7 @@ train_data,test_data = final_data.randomSplit([0.8,0.2])
 
 # FEATURE SELECTION -----------------------------------
 # Generate the RDD of hyperparameters to test
+print("Filling Hyperparameter RDD...")
 paramsRdd = generateHyperParamsRDD()
 
 # Get train and validation data
@@ -158,7 +161,11 @@ rdd_train_y = sc.broadcast(trainYRdd.collect())
 rdd_val_X = sc.broadcast(valRdd.collect())
 rdd_val_y = sc.broadcast(valYRdd.collect())
 
+# Measure time
+start = time.time()
+
 # RDD with (model,accuracy)
+print("Calculating best model...")
 modelsRdd = paramsRdd.map(generateModels)
 
 # Get the model with best accuracy :
@@ -173,9 +180,16 @@ acc = bestModel[1]
 
 layers = [5] + hlayers + [2]
 
+end = time.time()
+
+print("---------------------- Best model info ----------------------")
+print("Activation func : "+act)
+print("Max epochs : "+str(iters))
+print("Learning rate : "+str(lr))
+print("Hidden layers : " + str(hlayers))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------")
 # THIS IS WHERE HYPERPARAMETER SEARCH ENDS
-
-
 
 # Define number of experts (neural nets) to be trained
 num_of_experts = 10
@@ -187,6 +201,8 @@ dict_of_models = dict()
 dataframes = final_data.randomSplit([1.0 for x in range(num_of_experts)],seed=1234)
 
 # Get the models for each expert using the parameters of the best model defined above
+print("Generating and training experts...")
+start = time.time()
 for expert in range(num_of_experts):
 
     train_data,test_data = dataframes[expert].randomSplit([0.75,0.25])
@@ -203,6 +219,7 @@ for expert in range(num_of_experts):
 dict_of_predictions = dict()
 
 # Iterate through the expert and predict the values of each dataset
+print("Generating predictions...")
 for expert in range(num_of_experts):
     dict_of_predictions[expert] = dict_of_models[expert].transform(final_data)
 
@@ -217,6 +234,7 @@ evaluations_vote = []
 for index, row in evaluations.iterrows():
     evaluations_vote.append(committee_voting(row))
 
+end = time.time()
 
 # Create a dataframe with the label and the prediction
 predictionAndLabels = pd.concat([final_data.toPandas().label, pd.DataFrame(evaluations_vote)],axis=1)
@@ -227,6 +245,10 @@ predictionAndLabels['evaluation'] = np.where(predictionAndLabels.label == predic
 
 accuracy = predictionAndLabels.evaluation.sum() / predictionAndLabels.shape[0]
 
-print("total os 0's: " + str(predictionAndLabels.shape[0] - predictionAndLabels.evaluation.sum()) )
-print("total os 1's: " + str(predictionAndLabels.evaluation.sum()) )
-print('accuracy: ' + str(accuracy))
+print("---------------------- Final train/test info ----------------------")
+print("Final accuracy : "+str(accuracy))
+print("Time : "+str(end - start)+" seconds")
+print("-------------------------------------------------------------------")
+# print("total os 0's: " + str(predictionAndLabels.shape[0] - predictionAndLabels.evaluation.sum()) )
+# print("total os 1's: " + str(predictionAndLabels.evaluation.sum()) )
+# print('accuracy: ' + str(accuracy))
