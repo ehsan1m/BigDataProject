@@ -10,8 +10,7 @@ from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.classification import MultilayerPerceptronClassifier
 
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score
-
+from sklearn.metrics import accuracy_score, confusion_matrix
 
 spark = SparkSession.builder.appName('ensemble_with_param_search').getOrCreate()
 sc = spark.sparkContext
@@ -245,10 +244,19 @@ predictionAndLabels['evaluation'] = np.where(predictionAndLabels.label == predic
 
 accuracy = predictionAndLabels.evaluation.sum() / predictionAndLabels.shape[0]
 
+cnf_matrix = confusion_matrix(predictionAndLabels.label, predictionAndLabels.predictions)
+
+TP = cnf_matrix[0][0]
+TN = cnf_matrix[1][1]
+FN = cnf_matrix[1][0]
+FP = cnf_matrix[0][1]
+
 print("---------------------- Final train/test info ----------------------")
 print("Final accuracy : "+str(accuracy))
+print("Real 1s classified as 1s : "+str(TP)) 
+print("Real 0s classified as 0s : "+str(TN)) 
+print("Real 1s classified as 0s : "+str(FN))
+print("Real 0s classified as 1s : "+str(FP))
 print("Time : "+str(end - start)+" seconds")
 print("-------------------------------------------------------------------")
-# print("total os 0's: " + str(predictionAndLabels.shape[0] - predictionAndLabels.evaluation.sum()) )
-# print("total os 1's: " + str(predictionAndLabels.evaluation.sum()) )
-# print('accuracy: ' + str(accuracy))
+
