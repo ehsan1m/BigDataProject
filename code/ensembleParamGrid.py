@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import sys
 import time
+import itertools
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
@@ -23,6 +24,19 @@ def committee_voting(dataframe_row):
         return 1
     else:
         return 0 
+
+# Generate a permutation of all elements of the list input_layers and concatenate
+# to it's beginning and end the number of neurons in the input and output layers
+def generateLayersCombination(hidden_layers, input_layer, output_layer):
+    layers_combination = []
+    for i in range(len(hidden_layers)+1):
+        for j in list(list(tup) for tup in itertools.permutations(hidden_layers, i)):
+            layers_combination.append(j)
+
+    for i in range(len(layers_combination)):
+        layers_combination[i] = input_layer + layers_combination[i] + output_layer
+
+    return layers_combination
 
 schema = StructType([
     StructField('station', StringType(), False),
@@ -69,11 +83,15 @@ mlpc = MultilayerPerceptronClassifier(blockSize=128, seed=1234)
 #     .addGrid(mlpc.tol, [1e-06, 1e-05, 1e-04])\
 #     .build()
 
+hidden_layers = [1,2]
+input_layer = [5]
+output_layer = [2]
+
 # SIMPLER COMBINATION FOR TEST
 print("Creating parameter grid builder...")
 paramGrid = ParamGridBuilder() \
     .addGrid(mlpc.maxIter, [500,1000]) \
-    .addGrid(mlpc.layers, [[5,1,2],[5,2,2],[5,5,2]]) \
+    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers, input_layer, output_layer)) \
     .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
     .build()
 
