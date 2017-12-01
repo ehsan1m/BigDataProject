@@ -33,7 +33,7 @@ data = data.na.drop()
 
 train_data,test_data = data.randomSplit([0.8,0.2]) # Splitting the dataset between training and testing data
 
-data1, data2, data3 = train_data.randomSplit([1.0,2.0,20.0],1234) # Splitting thetraining data into 3 subsets for boosting, each used for one MLP. The second and third sets are twice and ten times larger than the first, respectively
+data1, data2, data3 = train_data.randomSplit([1.0,2.0,20.0],1234) # Splitting the training data into 3 subsets for boosting, each used for one MLP. The second and third sets are twice and twenty times larger than the first, respectively
 
 assembler = VectorAssembler(inputCols=['dateofyear','latitude', #vectorizing the input features(required for Spark ML)
                                        'longitude','elevation',
@@ -167,11 +167,24 @@ ensemblePrediction = predictions3.withColumn('prediction',predictions3['predicti
 ensemblePrediction = ensemblePrediction.withColumn('prediction',ensemblePrediction['prediction'].cast(DoubleType()))
 
 score = evaluator.evaluate(ensemblePrediction)
+TP = ensemblePrediction.where(ensemblePrediction.label==1).where(ensemblePrediction.prediction==1).count()
+TN = ensemblePrediction.where(ensemblePrediction.label==0).where(ensemblePrediction.prediction==0).count()
+FP = ensemblePrediction.where(ensemblePrediction.label==0).where(ensemblePrediction.prediction==1).count()
+FN = ensemblePrediction.where(ensemblePrediction.label==1).where(ensemblePrediction.prediction==0).count()
+precision = TP/(TP+FP)
+recall = TP/(TP+FN)
 
 print("---------------------- Final train/test info ----------------------")
 print("Accuracy for first expert :"+str(score1))
 print("Accuracy for second expert :"+str(score1))
 print("Accuracy for third expert :"+str(score1))
 print("Final accuracy : "+str(score))
+print("Confusion Matrix:")
+print("TP FN")
+print("FP TN")
+print("TP=",TP," FN=",FN)
+print("FP=",FP," TN=",TN)
+print("Precision:",precision)
+print("Recall:",recall)
 print("Time : "+str(end - start)+" seconds")
 print("-------------------------------------------------------------------")
