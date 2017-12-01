@@ -11,7 +11,7 @@ spark = SparkSession.builder.appName('Boosted MLPs').getOrCreate()
 
 schema = StructType([
     StructField('station', StringType(), False),
-    StructField('dateofyear', IntegerType(), False),
+    StructField('dateofyear', FloatType(), False),
     StructField('latitude', FloatType(), False),
     StructField('longitude', FloatType(), False),
     StructField('elevation', FloatType(), False),
@@ -31,7 +31,8 @@ train_data,test_data = data.randomSplit([0.7,0.3]) # Splitting the dataset betwe
 
 data1, data2, data3 = train_data.randomSplit([1.0,2.0,20.0],1234) # Splitting thetraining data into 3 subsets for boosting, each used for one MLP. The second and third sets are twice and ten times larger than the first, respectively
 
-assembler = VectorAssembler(inputCols=['dateofyear','latitude', #vectorizing the input features(required for Spark ML)
+#vectorizing the input features(required for Spark ML)
+assembler = VectorAssembler(inputCols=['dateofyear','latitude', 
                                        'longitude','elevation',
                                        'tmax'],
                             outputCol='features')
@@ -93,6 +94,7 @@ predictions3 = predictions3.withColumn('prediction',predictions3['prediction']+p
 
 ensemblePrediction = predictions3.withColumn('prediction',predictions3['prediction'] >= 2)
 ensemblePrediction = ensemblePrediction.withColumn('prediction',ensemblePrediction['prediction'].cast(DoubleType()))
+ensemblePrediction.cache()
 
 score = evaluator.evaluate(ensemblePrediction)
 
@@ -100,3 +102,20 @@ print("Test set accuracy for the first expert = " , score1)
 print("Test set accuracy for the second expert = " , score2)
 print("Test set accuracy for the third expert = " , score3)
 print("Test set accuracy with boosting = " , score)
+
+
+
+TP = ensemblePrediction.where(ensemblePrediction.label==1).where(ensemblePrediction.prediction==1).count()
+TN = ensemblePrediction.where(ensemblePrediction.label==0).where(ensemblePrediction.prediction==0).count()
+FP = ensemblePrediction.where(ensemblePrediction.label==0).where(ensemblePrediction.prediction==1).count()
+FN = ensemblePrediction.where(ensemblePrediction.label==1).where(ensemblePrediction.prediction==0).count()
+precision = TP/(TP+FP)
+recall = TP/(TP+FN)
+print("Confusion Matrix:")
+print("TP FN")
+print("FP TN")
+print("TP=",TP," FN=",FN)
+print("FP=",FP," TN=",TN)
+print("Precision:",precision)
+print("Recall:",recall)
+
