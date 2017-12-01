@@ -1,92 +1,19 @@
-import sys
 import pandas as pd
 import numpy as np
+import sys
 import time
+import itertools
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import *
 
 from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.classification import MultilayerPerceptronClassifier
-
-from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix
-
-spark = SparkSession.builder.appName('ensemble_with_param_search').getOrCreate()
-sc = spark.sparkContext
-
-# Generates a hyperparameter RDD with the indicated parameters
-def generateHyperParamsRDD() :
-    # Use this for long tests
-    # activationFuncs = ['logistic']
-    # learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-    # maxIters = [500,1000,2000] # Max number of epochs
-    # numHiddenL = [1,2,3] # Number of hidden layers
-    # neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
-    # hiddenLayerNums = []
-    
-    # Use this for short tests
-    activationFuncs = ['logistic']
-    learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
-    maxIters = [500,1000] # Max number of epochs
-    numHiddenL = [1] # Number of hidden layers
-    neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
-    hiddenLayerNums = []
-
-    # Fill in the different hidden layer neuron combinations
-    for num in numHiddenL :
-        for neu in neuronsPerLayer :
-            neurons = [neu]
-            if (num > 1) :
-                for neu2 in neuronsPerLayer :
-                    neurons += [neu2]
-                    if (num > 2) :
-                        for neu3 in neuronsPerLayer :
-                            neurons += [neu3]
-                            hiddenLayerNums.append(neurons)
-                            neurons = neurons[:-1]
-                    else :
-                        hiddenLayerNums.append(neurons)
-                        
-                    neurons = neurons[:-1]
-            else :
-                hiddenLayerNums.append(neurons)
-
-    # Fill in the RDD of hyperparameter combinations
-    hyperParams = []
-    for f in activationFuncs :
-        for lr in learnRates :
-            for iters in maxIters :
-                for hl in hiddenLayerNums :
-                    hyperParams.append([f,lr,iters,hl])
+from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 
 
-    # Transform the hyperparameter array into an RDD
-    return sc.parallelize(hyperParams)
-
-def listTransformTrain(row) :
-    f = row.features
-    return [f[0],f[1],f[2],f[3],f[4]]
-
-def transformTest(row) :
-    return row.label
-
-def generateModels(params) :
-    model =  MLPClassifier(solver='sgd', learning_rate='constant',
-                    activation=params[0],
-                    learning_rate_init=params[1],
-                    max_iter=params[2],
-                    hidden_layer_sizes=params[3])
-    model.fit(rdd_train_X.value,rdd_train_y.value)
-    preds = model.predict(rdd_val_X.value)
-    return (model,accuracy_score(rdd_val_y.value,preds))
-
-# 
-def getBestModel(m1,m2) :
-    if (m1[1] > m2[1]) :
-        return m1
-    else :
-        return m2
+spark = SparkSession.builder.appName('ensemble_with_param_grid').getOrCreate()
 
 # For a row with columns as predictions, choose the class based on the majority
 def committee_voting(dataframe_row):
@@ -94,7 +21,20 @@ def committee_voting(dataframe_row):
     if total_values >= (num_of_experts / 2):
         return 1
     else:
-        return 0   
+        return 0 
+
+# Generate a permutation of all elements of the list input_layers and concatenate
+# to it's beginning and end the number of neurons in the input and output layers
+def generateLayersCombination(hidden_layers, input_layer, output_layer):
+    layers_combination = []
+    for i in range(len(hidden_layers)+1):
+        for j in list(list(tup) for tup in itertools.permutations(hidden_layers, i)):
+            layers_combination.append(j)
+
+    for i in range(len(layers_combination)):
+        layers_combination[i] = input_layer + layers_combination[i] + output_layer
+
+    return layers_combination
 
 def genConfMatrix(realLabels,preds) :
     TP = 0
@@ -111,8 +51,8 @@ def genConfMatrix(realLabels,preds) :
         elif (realLabels[i] == 0) and (preds[i] == 0) :
             TN += 1
 
-    return TP,TN,FP,FN                
- 
+    return TP,TN,FP,FN        
+
 schema = StructType([
     StructField('station', StringType(), False),
     StructField('dateofyear', FloatType(), False),
@@ -123,89 +63,82 @@ schema = StructType([
     StructField('label', IntegerType(), False),
 ])
 
-input_file = sys.argv[1]
+input_file = sys.argv[1] 
 
 print("Reading input data...")
 data = spark.read.csv(input_file,sep=' ',schema=schema)
 
+#drop the rows with 'nan' values (if exist)
 data = data.na.drop()
 
+# create a column with the composition of all the features
 assembler = VectorAssembler(inputCols=['dateofyear','latitude', 
                                        'longitude','elevation',
                                        'tmax'],
                             outputCol='features')
-
 output = assembler.transform(data)
 
+# create spark df with the columns features and label
 processed_data = output.select('features','label')
 
 train_data,test_data = processed_data.randomSplit([0.8,0.2])
 
-# FEATURE SELECTION -----------------------------------
-# Generate the RDD of hyperparameters to test
-print("Filling Hyperparameter RDD...")
-paramsRdd = generateHyperParamsRDD()
+##### GRID PARAMETER BUILDER
 
-# Get train and validation data
-train,val = train_data.randomSplit([0.8,0.2])
+mlpc = MultilayerPerceptronClassifier(blockSize=128, seed=1234)
 
-# Generate dataframes for classlabels and drop class rows
-trainY = train.select(train.label)
-valY = val.select(val.label)
-train = train.drop(train.label)
-val = val.drop(val.label)
+# We use a ParamGridBuilder to construct a grid of parameters to search over.
+# TrainValidationSplit will try all combinations of values and determine best model using
+# the evaluator.
+# paramGrid = ParamGridBuilder() \
+# 	.addGrid(mlpc.maxIter, [5, 1000,1000,2000]) \
+#     .addGrid(mlpc.layers, [[2,2,2],[2,5,2],[3,6,3,2]])\
+#     .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02])\
+#     .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
+#     .addGrid(mlpc.tol, [1e-06, 1e-05, 1e-04])\
+#     .build()
 
-# Transform dataframes into rdds
-trainRdd = train.rdd 
-valRdd = val.rdd 
-trainYRdd = trainY.rdd 
-valYRdd = valY.rdd
+hidden_layers = [1,2,5]
+input_layer = [5]
+output_layer = [2]
 
-# Generate train and test Rdds with rows as lists
-trainRdd = trainRdd.map(listTransformTrain)
-valRdd = valRdd.map(listTransformTrain)
+# SIMPLER COMBINATION FOR TEST
+print("Creating parameter grid builder...")
+paramGrid = ParamGridBuilder() \
+    .addGrid(mlpc.maxIter, [500,1000]) \
+    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers, input_layer, output_layer)) \
+    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
+    .build()
 
-# Generate train and val class labels as singletons
-trainYRdd = trainYRdd.map(transformTest)
-valYRdd = valYRdd.map(transformTest)
 
-# Broadcast train data and train labels
-rdd_train_X = sc.broadcast(trainRdd.collect())
-rdd_train_y = sc.broadcast(trainYRdd.collect())
-
-# # Broadcast test data
-rdd_val_X = sc.broadcast(valRdd.collect())
-rdd_val_y = sc.broadcast(valYRdd.collect())
-
-# Measure time
-start = time.time()
-
-# RDD with (model,accuracy)
 print("Calculating best model...")
-modelsRdd = paramsRdd.map(generateModels)
+# A TrainValidationSplit requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
+start = time.time()
+tvs = TrainValidationSplit(estimator=mlpc,
+                           estimatorParamMaps=paramGrid,
+                           evaluator=RegressionEvaluator(),
+                           # 80% of the data will be used for training, 20% for validation.
+                           trainRatio=0.8)
 
-# Get the model with best accuracy :
-bestModel = modelsRdd.reduce(getBestModel)
+# Run TrainValidationSplit, and choose the best set of parameters.
+model = tvs.fit(train_data)
 
-# Put hyperparams into variables
-act = bestModel[0].activation
-iters = bestModel[0].max_iter
-lr = bestModel[0].learning_rate_init
-hlayers = bestModel[0].hidden_layer_sizes
-acc = bestModel[1]
-
-layers = [5] + hlayers + [2]
+# Save the parameters of the best model into variables
+bestmodel = model.bestModel
+layers = list(bestmodel._java_obj.parent().getLayers())
+iters = bestmodel._java_obj.parent().getMaxIter()
+solver = bestmodel._java_obj.parent().getSolver()
+tol = bestmodel._java_obj.parent().getTol()
+lr = bestmodel._java_obj.parent().getStepSize()
 
 end = time.time()
 
 print("---------------------- Best model info ----------------------")
-print("Activation func : "+act)
 print("Max epochs : "+str(iters))
 print("Learning rate : "+str(lr))
-print("Hidden layers : " + str(hlayers))
+print("Hidden layers : " + str(layers))
 print("Time : "+str(end - start)+" seconds")
 print("-------------------------------------------------------------")
-# THIS IS WHERE HYPERPARAMETER SEARCH ENDS
 
 # Define number of experts (neural nets) to be trained
 num_of_experts = 10
@@ -226,7 +159,9 @@ for expert in range(num_of_experts):
     trainer = MultilayerPerceptronClassifier(maxIter=iters, 
                                              layers=layers,
                                              stepSize=lr,
-                                             blockSize=128, 
+                                             blockSize=128,
+                                             solver=solver, ##### include in the other version
+                                             tol=tol, #### include in the other version
                                              seed=1234)
     model = trainer.fit(train_data_experts)
     dict_of_models[expert] = model
@@ -261,7 +196,7 @@ predictionAndLabels['evaluation'] = np.where(predictionAndLabels.label == predic
 
 accuracy = predictionAndLabels.evaluation.sum() / predictionAndLabels.shape[0]
 
-TP,TN,FP,FN= genConfMatrix(predictionAndLabels.label, predictionAndLabels.predictions)
+TP,TN,FP,FN = genConfMatrix(predictionAndLabels.label, predictionAndLabels.predictions)
 
 print("---------------------- Final train/test info ----------------------")
 print("Final accuracy : "+str(accuracy))
@@ -271,4 +206,5 @@ print("Real 1s classified as 0s : "+str(FN))
 print("Real 0s classified as 1s : "+str(FP))
 print("Time : "+str(end - start)+" seconds")
 print("-------------------------------------------------------------------")
+
 
