@@ -23,20 +23,20 @@ assert spark.version >= '2.2'  # make sure we have Spark 2.2+
 # Generates a hyperparameter RDD with the indicated parameters
 def generateHyperParamsRDD() :
 	# Use this for long tests
-	# activationFuncs = ['logistic', 'tanh', 'relu']
-	# learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-	# maxIters = [500,1000,2000] # Max number of epochs
-	# numHiddenL = [1,2,3] # Number of hidden layers
-	# neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
-	# hiddenLayerNums = []
+	activationFuncs = ['logistic', 'tanh', 'relu']
+	learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
+	maxIters = [500,1000,2000] # Max number of epochs
+	numHiddenL = [1,2,3] # Number of hidden layers
+	neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
+	hiddenLayerNums = []
 
 	# Use this for short tests
-	activationFuncs = ['logistic']
-	learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
-	maxIters = [500,1000] # Max number of epochs
-	numHiddenL = [1] # Number of hidden layers
-	neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
-	hiddenLayerNums = []
+	# activationFuncs = ['logistic']
+	# learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
+	# maxIters = [500,1000] # Max number of epochs
+	# numHiddenL = [1] # Number of hidden layers
+	# neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
+	# hiddenLayerNums = []
 
 	# Fill in the different hidden layer neuron combinations
 	for num in numHiddenL :
@@ -69,6 +69,7 @@ def generateHyperParamsRDD() :
 	# Transform the hyperparameter array into an RDD
 	return sc.parallelize(hyperParams)
 
+# These are all formatting functions for the data
 def listTransformTrain(row) :
 	return [row._c1,row._c2,row._c3,row._c4,row._c5]
 
@@ -80,7 +81,7 @@ def transformTest(row) :
 
 # Generate all the models with the different hyperparameter combinations
 def generateModels(params) :
-	model =  MLPClassifier(solver='sgd', learning_rate='constant',
+	model =  MLPClassifier(solver='lbfgs', learning_rate='constant',
 					activation=params[0],
 					learning_rate_init=params[1],
 					max_iter=params[2],
@@ -106,7 +107,7 @@ def trainFinalModels(trainList) :
 	trainSet = np.delete(npTrainList,5,1)
 
 	# Create and train the model 
-	model =  MLPClassifier(solver='sgd', learning_rate='constant',
+	model =  MLPClassifier(solver='lbfgs', learning_rate='constant',
 				activation=act,
 				learning_rate_init=lr,
 				max_iter=iters,
@@ -117,7 +118,7 @@ def trainFinalModels(trainList) :
 def getTestPredictions(model) :
 	return model.predict(rdd_test_X.value)
 
-
+# Sum predictions p1 and p2 (will divide by 10 after for average)
 def averagePreds(p1,p2) :
 	newList = []
 

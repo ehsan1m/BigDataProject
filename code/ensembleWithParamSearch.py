@@ -18,7 +18,7 @@ sc = spark.sparkContext
 # Generates a hyperparameter RDD with the indicated parameters
 def generateHyperParamsRDD() :
     # Use this for long tests
-    # activationFuncs = ['logistic', 'tanh', 'relu']
+    # activationFuncs = ['logistic']
     # learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
     # maxIters = [500,1000,2000] # Max number of epochs
     # numHiddenL = [1,2,3] # Number of hidden layers
@@ -204,7 +204,7 @@ print("Generating and training experts...")
 start = time.time()
 for expert in range(num_of_experts):
 
-    train_data,test_data = dataframes[expert].randomSplit([0.75,0.25])
+    train_data,test_data = dataframes[expert].randomSplit([0.8,0.2])
     
     trainer = MultilayerPerceptronClassifier(maxIter=iters, 
                                              layers=layers,
