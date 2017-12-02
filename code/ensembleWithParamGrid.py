@@ -15,6 +15,9 @@ from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 
 spark = SparkSession.builder.appName('ensemble_with_param_grid').getOrCreate()
 
+assert sc.version >= '2.2'  # make sure we have Spark 2.2+
+assert sys.version_info >= (3, 4) # make sure we have Python 3.4+
+
 # For a row with columns as predictions, choose the class based on the majority
 def committee_voting(dataframe_row):
     total_values = dataframe_row.values.sum()
@@ -87,28 +90,32 @@ train_data,test_data = processed_data.randomSplit([0.8,0.2])
 
 mlpc = MultilayerPerceptronClassifier(blockSize=128, seed=1234)
 
+
+    # Use this for long tests
+    # activationFuncs = ['logistic']
+    # learnRates = [0.2,0.1,0.05,0.02,0.01,0.005] # Learning Rates
+    # maxIters = [1000,1500] # Max number of epochs
+    # numHiddenL = [1,2,3] # Number of hidden layers
+    # neuronsPerLayer = [5,10,20] # Number of neurons in each hidden layer
+    # hiddenLayerNums = []
+
+print("Creating parameter grid builder...")
 # We use a ParamGridBuilder to construct a grid of parameters to search over.
 # TrainValidationSplit will try all combinations of values and determine best model using
 # the evaluator.
-# paramGrid = ParamGridBuilder() \
-# 	.addGrid(mlpc.maxIter, [5, 1000,1000,2000]) \
-#     .addGrid(mlpc.layers, [[2,2,2],[2,5,2],[3,6,3,2]])\
-#     .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02])\
-#     .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
-#     .addGrid(mlpc.tol, [1e-06, 1e-05, 1e-04])\
-#     .build()
+paramGrid = ParamGridBuilder() \
+	.addGrid(mlpc.maxIter, [1000,1500]) \
+    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [5,10,20], input_layer = [5], output_layer = [2])) \
+    .addGrid(mlpc.stepSize, [0.2,0.1,0.05,0.02,0.01,0.005])\
+    .build()
 
-hidden_layers = [1,2,5]
-input_layer = [5]
-output_layer = [2]
 
 # SIMPLER COMBINATION FOR TEST
-print("Creating parameter grid builder...")
-paramGrid = ParamGridBuilder() \
-    .addGrid(mlpc.maxIter, [500,1000]) \
-    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers, input_layer, output_layer)) \
-    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
-    .build()
+# paramGrid = ParamGridBuilder() \
+#     .addGrid(mlpc.maxIter, [500,1000]) \
+#     .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [1,2,5], input_layer = [5], output_layer = [2])) \
+#     .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
+#     .build()
 
 
 print("Calculating best model...")
@@ -128,8 +135,8 @@ bestmodel = model.bestModel
 layers = list(bestmodel._java_obj.parent().getLayers())
 iters = bestmodel._java_obj.parent().getMaxIter()
 solver = bestmodel._java_obj.parent().getSolver()
-tol = bestmodel._java_obj.parent().getTol()
-lr = bestmodel._java_obj.parent().getStepSize()
+# tol = bestmodel._java_obj.parent().getTol()
+# lr = bestmodel._java_obj.parent().getStepSize()
 
 end = time.time()
 
@@ -160,8 +167,8 @@ for expert in range(num_of_experts):
                                              layers=layers,
                                              stepSize=lr,
                                              blockSize=128,
-                                             solver=solver, ##### include in the other version
-                                             tol=tol, #### include in the other version
+                                             # solver=solver, ##### include in the other version
+                                             # tol=tol, #### include in the other version
                                              seed=1234)
     model = trainer.fit(train_data_experts)
     dict_of_models[expert] = model
