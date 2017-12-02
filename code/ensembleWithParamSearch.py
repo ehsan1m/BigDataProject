@@ -19,10 +19,10 @@ sc = spark.sparkContext
 def generateHyperParamsRDD() :
     # Use this for long tests
     # activationFuncs = ['logistic']
-    # learnRates = [0.5,0.2,0.1,0.05,0.02,0.01,0.005,0.002,0.001] # Learning Rates
-    # maxIters = [500,1000,2000] # Max number of epochs
+    # learnRates = [0.2,0.1,0.05,0.02,0.01,0.005] # Learning Rates
+    # maxIters = [1000,1500] # Max number of epochs
     # numHiddenL = [1,2,3] # Number of hidden layers
-    # neuronsPerLayer = [2,5,10,20] # Number of neurons in each hidden layer
+    # neuronsPerLayer = [5,10,20] # Number of neurons in each hidden layer
     # hiddenLayerNums = []
     
     # Use this for short tests
