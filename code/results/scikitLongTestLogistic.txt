@@ -1,28 +1,44 @@
-weather 2 tmax 2 : 
+weather 2 tmax 2
 
-
-Filling Hyperparameter RDD...
-Reading input data...
-Calculating best model...
 ---------------------- Best model info ----------------------
 Activation func : logistic
 Max epochs : 1500
-Learning rate : 0.01
-Hidden layers : [20, 10]
-Time : 2019.510321855545 seconds
+Learning rate : 0.2
+Hidden layers : [10, 20]
+Time : 128.6069679260254 seconds
 -------------------------------------------------------------
 Processing data for final training and testing...
 Training experts...
 Generating predictions...
 ---------------------- Final train/test info ----------------------
-Final accuracy : 0.694835680751
-Real 1s classified as 1s : 553
-Real 0s classified as 0s : 3295
-Real 1s classified as 0s : 1271
-Real 0s classified as 1s : 419
-Time : 46.51233196258545 seconds
+Final accuracy : 0.693744493392
+Real 1s classified as 1s : 473
+Real 0s classified as 0s : 3464
+Real 1s classified as 0s : 1429
+Real 0s classified as 1s : 309
+Time : 41.98460531234741 seconds
 -------------------------------------------------------------------
 
+
 weather 3 tmax 2:
+
+---------------------- Best model info ----------------------
+Activation func : logistic
+Max epochs : 1000
+Learning rate : 0.2
+Hidden layers : [5]
+Time : 667.5883705615997 seconds
+-------------------------------------------------------------
+Processing data for final training and testing...
+Training experts...
+Generating predictions...
+---------------------- Final train/test info ----------------------
+Final accuracy : 0.667709867452
+Real 1s classified as 1s : 205
+Real 0s classified as 0s : 14303
+Real 1s classified as 0s : 7091
+Real 0s classified as 1s : 129
+Time : 12.920961141586304 seconds
+-------------------------------------------------------------------
 
 
