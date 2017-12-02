@@ -15,6 +15,9 @@ from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 
 spark = SparkSession.builder.appName('ensemble_with_param_grid').getOrCreate()
 
+assert sc.version >= '2.2'  # make sure we have Spark 2.2+
+assert sys.version_info >= (3, 4) # make sure we have Python 3.4+
+
 # For a row with columns as predictions, choose the class based on the majority
 def committee_voting(dataframe_row):
     total_values = dataframe_row.values.sum()
