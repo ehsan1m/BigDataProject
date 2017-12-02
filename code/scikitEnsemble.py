@@ -81,7 +81,7 @@ def transformTest(row) :
 
 # Generate all the models with the different hyperparameter combinations
 def generateModels(params) :
-	model =  MLPClassifier(solver='lbfgs', learning_rate='constant',
+	model =  MLPClassifier(solver='sgd', learning_rate='constant',
 					activation=params[0],
 					learning_rate_init=params[1],
 					max_iter=params[2],
@@ -233,12 +233,6 @@ if __name__ == "__main__":
 	hlayers = bestModel[0].hidden_layer_sizes
 	acc = bestModel[1]
 
-	# Broadcast best hyperparameters
-	sc.broadcast(act)
-	sc.broadcast(iters)
-	sc.broadcast(lr)
-	sc.broadcast(hlayers)
-
 	# Measure time
 	end = time.time()
 
@@ -250,7 +244,11 @@ if __name__ == "__main__":
 	print("Time : "+str(end - start)+" seconds")
 	print("-------------------------------------------------------------")
 
-	# Here is where the hyperparameter search ends 
+	# Broadcast best hyperparameters
+	sc.broadcast(act)
+	sc.broadcast(iters)
+	sc.broadcast(lr)
+	sc.broadcast(hlayers) 
 
 	# Generate the 10 data sets, one for each expert in the ensemble
 	print("Processing data for final training and testing...")

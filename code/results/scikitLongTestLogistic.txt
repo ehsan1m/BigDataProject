@@ -1,23 +1,6 @@
-weather2 tmax 2
-
-my computer :
----------------------- Best model info ----------------------
-Activation func : logistic
-Max epochs : 1000
-Learning rate : 0.005
-Hidden layers : [20, 5]
-Time : 6456.082148313522 seconds
--------------------------------------------------------------
+weather 2 tmax 2 : 
 
 
-Final accuracy : 0.666967346202
-Real 1s classified as 1s : 110
-Real 0s classified as 0s : 3587
-Real 1s classified as 0s : 1796
-Real 0s classified as 1s : 50
-Time : 58.551496267318726 seconds
-
-cluster :
 Filling Hyperparameter RDD...
 Reading input data...
 Calculating best model...
