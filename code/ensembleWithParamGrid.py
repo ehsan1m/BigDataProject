@@ -100,21 +100,19 @@ print("Creating parameter grid builder...")
 # We use a ParamGridBuilder to construct a grid of parameters to search over.
 # TrainValidationSplit will try all combinations of values and determine best model using
 # the evaluator.
-# paramGrid = ParamGridBuilder() \
-# 	.addGrid(mlpc.maxIter, [1000,1500]) \
-#     .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [1,2,5], input_layer = [5], output_layer = [2])) \
-#     .addGrid(mlpc.stepSize, [0.2,0.1,0.05,0.02,0.01,0.005])\
-#     .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
-#     .addGrid(mlpc.tol, [1e-06, 1e-05, 1e-04])\
-#     .build()
+paramGrid = ParamGridBuilder() \
+	.addGrid(mlpc.maxIter, [1000,1500]) \
+    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [5,10,20], input_layer = [5], output_layer = [2])) \
+    .addGrid(mlpc.stepSize, [0.2,0.1,0.05,0.02,0.01,0.005])\
+    .build()
 
 
 # SIMPLER COMBINATION FOR TEST
-paramGrid = ParamGridBuilder() \
-    .addGrid(mlpc.maxIter, [500,1000]) \
-    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [1,2,5], input_layer = [5], output_layer = [2])) \
-    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
-    .build()
+# paramGrid = ParamGridBuilder() \
+#     .addGrid(mlpc.maxIter, [500,1000]) \
+#     .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [1,2,5], input_layer = [5], output_layer = [2])) \
+#     .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02]) \
+#     .build()
 
 
 print("Calculating best model...")
