@@ -1,0 +1,19 @@
+Input: weather-3_tmax-2_scaled.csv
+
+---------------------- Best model info ----------------------
+Activation func : logistic
+Max epochs : 1500
+Learning rate : 0.2
+Hidden layers : [5, 20]
+Time : 696.5047037601471 seconds
+-------------------------------------------------------------
+
+
+---------------------- Final train/test info ----------------------
+Final accuracy : 0.6846315597
+Real 1s classified as 1s : 1098
+Real 0s classified as 0s : 13879
+Real 1s classified as 0s : 6145
+Real 0s classified as 1s : 754
+Time : 620.3539581298828 seconds
+-------------------------------------------------------------------
