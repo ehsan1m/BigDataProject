@@ -13,9 +13,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 spark = SparkSession.builder.appName('ensemble_with_param_search').getOrCreate()
-sc = spark.sparkContext
+# sc = spark.sparkContext
 
-assert sc.version >= '2.2'  # make sure we have Spark 2.2+
 assert sys.version_info >= (3, 4) # make sure we have Python 3.4+
 
 # Generates a hyperparameter RDD with the indicated parameters

@@ -12,10 +12,8 @@ from pyspark.ml.classification import MultilayerPerceptronClassifier
 from pyspark.ml.evaluation import RegressionEvaluator
 from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 
-
 spark = SparkSession.builder.appName('ensemble_with_param_grid').getOrCreate()
 
-assert sc.version >= '2.2'  # make sure we have Spark 2.2+
 assert sys.version_info >= (3, 4) # make sure we have Python 3.4+
 
 # For a row with columns as predictions, choose the class based on the majority
@@ -134,9 +132,9 @@ model = tvs.fit(train_data)
 bestmodel = model.bestModel
 layers = list(bestmodel._java_obj.parent().getLayers())
 iters = bestmodel._java_obj.parent().getMaxIter()
-solver = bestmodel._java_obj.parent().getSolver()
+# solver = bestmodel._java_obj.parent().getSolver()
 # tol = bestmodel._java_obj.parent().getTol()
-# lr = bestmodel._java_obj.parent().getStepSize()
+lr = bestmodel._java_obj.parent().getStepSize()
 
 end = time.time()
 
