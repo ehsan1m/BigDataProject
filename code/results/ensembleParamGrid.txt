@@ -1,0 +1,15 @@
+---------------------- Best model info ----------------------
+Max epochs : 1500
+Learning rate : 0.2
+Layers : [5, 20, 5, 2]
+Time : 24781.594980478287 seconds
+-------------------------------------------------------------
+
+---------------------- Final train/test info ----------------------
+Final accuracy : 0.678240952817
+Real 1s classified as 1s : 1150
+Real 0s classified as 0s : 13656
+Real 1s classified as 0s : 6180
+Real 0s classified as 1s : 844
+Time : 620.8214888572693 seconds
+-------------------------------------------------------------------
