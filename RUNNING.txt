@@ -1,0 +1,15 @@
+Our project has 5 important files. 
+
+BoostingWithGridSearch.py
+BoostingWithParameterSearch.py
+ensembleWithParamGrid.py
+ensembleWithParamSearch.py
+scikitEnsemble.py
+
+All of them are run the same way 
+
+spark-submit filename inputfile
+
+The only requirement is to make sure scikit-learn is installed in the cluster for the user running the code.
+
+The input files are located in the data folder. And are called weather-3_tmax-2_scaled.csv and weather-2_tmax-2_scaled.csv, please refrain from using the other versions of those 2 files. They are also small enough to fit in main memory. 

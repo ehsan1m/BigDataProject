@@ -41,4 +41,31 @@ Real 0s classified as 1s : 129
 Time : 12.920961141586304 seconds
 -------------------------------------------------------------------
 
+THE TESTS BELOW USE LOGISTIC,TANH AND RELU FUNCTIONS :
+
+weather2 tmax 2
+
+---------------------- Best model info ----------------------
+Activation func : relu
+Max epochs : 1000
+Learning rate : 0.02
+Hidden layers : [20, 10, 5]
+Time : 1474.5814175605774 seconds
+-------------------------------------------------------------
+Processing data for final training and testing...
+Training experts...
+Generating predictions...
+---------------------- Final train/test info ----------------------
+Final accuracy : 0.688904873224
+Real 1s classified as 1s : 385
+Real 0s classified as 0s : 3446
+Real 1s classified as 0s : 1466
+Real 0s classified as 1s : 264
+Time : 17.397920846939087 seconds
+-------------------------------------------------------------------
+
+
+weather3 tmax 3
+% Coudnt run apparently
+
 
