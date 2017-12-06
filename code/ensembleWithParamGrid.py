@@ -214,7 +214,3 @@ print("Real 1s classified as 0s : "+str(FN))
 print("Real 0s classified as 1s : "+str(FP))
 print("Time : "+str(end - start)+" seconds")
 print("-------------------------------------------------------------------")
-
-result = {"accuracy": [accuracy], "best_model_time": [best_model_time], "prediction_time": [(end - start)] , "TP": [TP], "TN": [TN], "FP": [FP], "FN": [FN]}
-output = spark.createDataFrame(pd.DataFrame.from_dict(result))
-output.coalesce(1).write.csv('output-bigdata-project/',mode='overwrite',header=True)
