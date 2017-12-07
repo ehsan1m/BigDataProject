@@ -20,20 +20,20 @@ assert sys.version_info >= (3, 4) # make sure we have Python 3.4+
 # Generates a hyperparameter RDD with the indicated parameters
 def generateHyperParamsRDD() :
     # Use this for long tests
-    activationFuncs = ['logistic']
-    learnRates = [0.2,0.1,0.05,0.02,0.01,0.005] # Learning Rates
-    maxIters = [1000,1500] # Max number of epochs
-    numHiddenL = [1,2,3] # Number of hidden layers
-    neuronsPerLayer = [5,10,20] # Number of neurons in each hidden layer
-    hiddenLayerNums = []
+    # activationFuncs = ['logistic']
+    # learnRates = [0.2,0.1,0.05,0.02,0.01,0.005] # Learning Rates
+    # maxIters = [1000,1500] # Max number of epochs
+    # numHiddenL = [1,2,3] # Number of hidden layers
+    # neuronsPerLayer = [5,10,20] # Number of neurons in each hidden layer
+    # hiddenLayerNums = []
     
     # Use this for short tests
-    # activationFuncs = ['logistic']
-    # learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
-    # maxIters = [500,1000] # Max number of epochs
-    # numHiddenL = [1] # Number of hidden layers
-    # neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
-    # hiddenLayerNums = []
+    activationFuncs = ['logistic']
+    learnRates = [0.5,0.2,0.1,0.05,0.02] # Learning Rates
+    maxIters = [500,1000] # Max number of epochs
+    numHiddenL = [1] # Number of hidden layers
+    neuronsPerLayer = [1,2,5] # Number of neurons in each hidden layer
+    hiddenLayerNums = []
 
     # Fill in the different hidden layer neuron combinations
     for num in numHiddenL :
@@ -204,7 +204,7 @@ print("---------------------- Best model info ----------------------")
 print("Activation func : "+act)
 print("Max epochs : "+str(iters))
 print("Learning rate : "+str(lr))
-print("Hidden layers : " + str(hlayers))
+print("Layers : " + str(layers))
 print("Time : "+str(end - start)+" seconds")
 print("-------------------------------------------------------------")
 # THIS IS WHERE HYPERPARAMETER SEARCH ENDS
