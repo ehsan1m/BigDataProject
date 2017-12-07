@@ -7,8 +7,22 @@ from pyspark.ml.feature import VectorAssembler, StringIndexer
 from pyspark.ml import Pipeline
 from pyspark.ml.tuning import ParamGridBuilder, TrainValidationSplit
 from pyspark.ml.evaluation import RegressionEvaluator
-import sys
-import time
+import sys,time,itertools
+
+
+# Generate a permutation of all elements of the list input_layers and concatenate
+# to it's beginning and end the number of neurons in the input and output layers
+def generateLayersCombination(hidden_layers, input_layer, output_layer):
+    layers_combination = []
+    for i in range(len(hidden_layers)+1):
+        for j in list(list(tup) for tup in itertools.permutations(hidden_layers, i)):
+            layers_combination.append(j)
+
+    for i in range(len(layers_combination)):
+        layers_combination[i] = input_layer + layers_combination[i] + output_layer
+
+    return layers_combination
+
 
 spark = SparkSession.builder.appName('Boosted MLPs').getOrCreate()
 
@@ -48,21 +62,18 @@ mlpc = MultilayerPerceptronClassifier()
 # We use a ParamGridBuilder to construct a grid of parameters to search over.
 # TrainValidationSplit will try all combinations of values and determine best model using
 # the evaluator.
-print("Creating parameter grid builder...")
 paramGrid = ParamGridBuilder() \
-	.addGrid(mlpc.maxIter, [500,1000]) \
-    .addGrid(mlpc.layers, [[5,1,2],[5,2,2],[5,5,2]])\
-    .addGrid(mlpc.stepSize, [0.5,0.2,0.1,0.05,0.02])\
-    .addGrid(mlpc.solver, ['l-bfgs'])\
-    .addGrid(mlpc.tol, [1e-06])\
+	.addGrid(mlpc.maxIter, [1000,1500]) \
+    .addGrid(mlpc.layers, generateLayersCombination(hidden_layers = [5,10,20], input_layer = [5], output_layer = [2])) \
+    .addGrid(mlpc.stepSize, [0.2,0.1,0.05,0.02,0.01,0.005])\
     .build()
 
+
+
 # SIMPLER COMBINATION FOR TEST
-# paramGrid = ParamGridBuilder().addGrid(mlpc.maxIter, [5, 10]) \
+#paramGrid = ParamGridBuilder().addGrid(mlpc.maxIter, [500, 100]) \
 #     .addGrid(mlpc.layers, [[5,2,2],[5,5,2]])\
 #     .addGrid(mlpc.stepSize, [0.5,0.2])\
-#     .addGrid(mlpc.solver, ['l-bfgs', 'gd'])\
-#     .addGrid(mlpc.tol, [1e-06, 1e-05])\
 #     .build()
 
 # A TrainValidationSplit requires an Estimator, a set of Estimator ParamMaps, and an Evaluator.
