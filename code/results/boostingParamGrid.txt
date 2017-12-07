@@ -1,0 +1,24 @@
+---------------------- Best model info ----------------------
+Max epochs : 1500
+Learning rate : 0.2
+Hidden layers : [5, 10, 20, 5, 2]
+Time : 43279.687844753265 seconds
+-------------------------------------------------------------
+Generating and training experts...
+Generating predictions...
+---------------------- Final train/test info ----------------------
+Accuracy for first expert :0.6644548470663091
+Accuracy for second expert :0.6644548470663091
+Accuracy for third expert :0.6644548470663091
+Final accuracy : 0.6859466581852879
+Confusion Matrix:
+TP= 1934  FN= 5417
+FP= 1495  TN= 13163
+Precision: 0.5640128317293671
+Recall: 0.26309345667256157
+Time : 230.24591064453125 seconds
+-------------------------------------------------------------------
+
+real	725m38.315s
+user	60m23.596s
+sys	10m40.520s
