@@ -90,15 +90,6 @@ train_data,test_data = processed_data.randomSplit([0.8,0.2])
 
 mlpc = MultilayerPerceptronClassifier(blockSize=128, seed=1234)
 
-
-    # Use this for long tests
-    # activationFuncs = ['logistic']
-    # learnRates = [0.2,0.1,0.05,0.02,0.01,0.005] # Learning Rates
-    # maxIters = [1000,1500] # Max number of epochs
-    # numHiddenL = [1,2,3] # Number of hidden layers
-    # neuronsPerLayer = [5,10,20] # Number of neurons in each hidden layer
-    # hiddenLayerNums = []
-
 print("Creating parameter grid builder...")
 # We use a ParamGridBuilder to construct a grid of parameters to search over.
 # TrainValidationSplit will try all combinations of values and determine best model using
@@ -168,8 +159,8 @@ for expert in range(num_of_experts):
                                              layers=layers,
                                              stepSize=lr,
                                              blockSize=128,
-                                             # solver=solver, ##### include in the other version
-                                             # tol=tol, #### include in the other version
+                                             # solver=solver, 
+                                             # tol=tol, 
                                              seed=1234)
     model = trainer.fit(train_data_experts)
     dict_of_models[expert] = model
