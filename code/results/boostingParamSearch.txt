@@ -1,24 +1,22 @@
-Reading input data...
-Calculating best model...
 ---------------------- Best model info ----------------------
 Activation func : logistic
-Max epochs : 1000
-Learning rate : 0.5
-Hidden layers : [10]
-Time : 337.910001039505 seconds
+Max epochs : 1500
+Learning rate : 0.2
+Hidden layers : [5, 5]
+Time : 712.6316764354706 seconds
 -------------------------------------------------------------
 Generating and training experts...
 Generating predictions...
 ---------------------- Final train/test info ----------------------
-Accuracy for first expert :0.6602991530005407
-Accuracy for second expert :0.6602991530005407
-Accuracy for third expert :0.6602991530005407
-Final accuracy : 0.6903946657055325
+Accuracy for first expert :0.676868099143263
+Accuracy for second expert :0.676868099143263
+Accuracy for third expert :0.676868099143263
+Final accuracy : 0.6841478495854899
 Confusion Matrix:
-TP= 458  FN= 1358
-FP= 360  TN= 3373
-Precision: 0.5599022004889975
-Recall: 0.2522026431718062
-Time : 116.4591817855835 seconds
+TP= 1541  FN= 5724
+FP= 1172  TN= 13396
+Precision: 0.5680058975304091
+Recall: 0.21211286992429457
+Time : 172.4348382949829 seconds
 -------------------------------------------------------------------
 
